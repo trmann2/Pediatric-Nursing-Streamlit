@@ -84,20 +84,22 @@ class PDFChatbot:
         
         return chunks
 
-    @st.cache_data
-    def _get_embedding(self, text):
-        inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-        return outputs.last_hidden_state.mean(dim=1).numpy()
+    def get_embedding(self, text):
+        @st.cache_data
+        def _cached_embedding(_text):
+            inputs = self.tokenizer(_text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+            return outputs.last_hidden_state.mean(dim=1).numpy()
+        return _cached_embedding(text)
 
     def _create_embeddings(self):
         with st.spinner("Processing content..."):
-            self.embeddings = np.vstack([self._get_embedding(chunk) for chunk in self.text_chunks])
+            self.embeddings = np.vstack([self.get_embedding(chunk) for chunk in self.text_chunks])
 
     def get_answer(self, question, top_k=3):
         try:
-            question_embedding = self._get_embedding(question)
+            question_embedding = self.get_embedding(question)
             similarities = cosine_similarity(question_embedding, self.embeddings)[0]
             
             top_indices = np.argsort(similarities)[-top_k:][::-1]
